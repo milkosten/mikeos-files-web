@@ -155,9 +155,16 @@ async function accessTokenFor(req) {
 // media seeking and If-Match conflict detection work end-to-end.
 app.all(/^\/drive-api\/.*/, async (req, res) => {
   const s = sessionOf(req);
-  if (!s) return res.status(401).json({ error: "not_authenticated" });
-  const tok = await accessTokenFor(req);
-  const headers = { Authorization: `Bearer ${tok}` };
+  // Link-share passthrough: a GET carrying ?link_token= is allowed WITHOUT a
+  // session — the files API validates the token itself (viewer-scoped, logged,
+  // revocable). Everything else requires the cookie session.
+  const isLinkAccess = req.method === "GET" && typeof req.query.link_token === "string";
+  if (!s && !isLinkAccess) return res.status(401).json({ error: "not_authenticated" });
+  const headers = {};
+  if (s) {
+    const tok = await accessTokenFor(req);
+    headers.Authorization = `Bearer ${tok}`;
+  }
   for (const h of ["content-type", "content-length", "accept", "range", "if-match", "if-none-match"]) {
     if (req.headers[h]) headers[h] = req.headers[h];
   }

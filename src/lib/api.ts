@@ -25,6 +25,15 @@ export interface Folder {
   id: string;
   name: string;
   parent_id: string | null;
+  my_role?: "owner" | "editor" | "commenter" | "viewer";
+}
+
+export interface Version {
+  version_no: number;
+  size: number | null;
+  sha256: string | null;
+  mime: string | null;
+  created_at: string | null;
 }
 
 export interface Grant {
@@ -38,7 +47,7 @@ export interface Grant {
 export interface Permissions {
   owner: { user_id: string; username?: string; display_name?: string };
   grants: Grant[];
-  link: { enabled: boolean };
+  link: { enabled: boolean; role?: string };
 }
 
 export interface Me {
@@ -62,8 +71,9 @@ async function j<T>(res: Response): Promise<T> {
 export const me = () => fetch("/auth/me").then((r) => j<Me>(r));
 export const logout = () => fetch("/auth/logout", { method: "POST" }).then((r) => j<{ ok: boolean }>(r));
 
-export const listFolders = () =>
-  fetch(`${API}/folders`).then((r) => j<{ folders: Folder[] }>(r)).then((d) => d.folders);
+export const listFolders = (shared = false) =>
+  fetch(`${API}/folders${shared ? "?shared_with_me=true" : ""}`)
+    .then((r) => j<{ folders: Folder[] }>(r)).then((d) => d.folders);
 
 export const createFolder = (name: string, parent_id: string | null) =>
   fetch(`${API}/folders`, {
@@ -71,12 +81,65 @@ export const createFolder = (name: string, parent_id: string | null) =>
     body: JSON.stringify({ name, parent_id }),
   }).then((r) => j<{ folder: Folder }>(r)).then((d) => d.folder);
 
-export const listFiles = (opts: { q?: string; folder_id?: string; shared?: boolean } = {}) => {
+export const listFiles = (opts: { q?: string; folder_id?: string; shared?: boolean; trashed?: boolean } = {}) => {
   const p = new URLSearchParams();
   if (opts.q) p.set("q", opts.q);
   if (opts.folder_id) p.set("folder_id", opts.folder_id);
   if (opts.shared) p.set("shared_with_me", "true");
+  if (opts.trashed) p.set("trashed", "true");
   return fetch(`${API}/files?${p}`).then((r) => j<{ files: DriveFile[] }>(r)).then((d) => d.files);
+};
+
+export const restoreFile = (id: string) =>
+  fetch(`${API}/files/${id}/restore`, { method: "POST" })
+    .then((r) => j<{ file: DriveFile }>(r)).then((d) => d.file);
+
+export const listVersions = (id: string) =>
+  fetch(`${API}/files/${id}/versions`)
+    .then((r) => j<{ versions: Version[] }>(r)).then((d) => d.versions);
+
+export const restoreVersion = (id: string, versionNo: number) =>
+  fetch(`${API}/files/${id}/versions/${versionNo}/restore`, { method: "POST" })
+    .then((r) => j<{ file: DriveFile; restored_version: number }>(r));
+
+export const versionUrl = (id: string, versionNo: number) =>
+  `${API}/files/${id}/versions/${versionNo}/content`;
+
+export const createLink = (id: string, role: string) =>
+  fetch(`${API}/files/${id}/link`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  }).then((r) => j<{ token: string; role: string }>(r));
+
+export const deleteLink = async (id: string) => {
+  const r = await fetch(`${API}/files/${id}/link`, { method: "DELETE" });
+  if (!r.ok) throw new ApiError(r.status, `HTTP ${r.status}`);
+};
+
+// The copyable share URL: same-origin, works with NO session — the BFF forwards
+// link_token requests through to the API unauthenticated.
+export const linkShareUrl = (id: string, token: string) =>
+  `${location.origin}${API}/files/${id}/content?link_token=${token}`;
+
+// ---- folder sharing ----
+export const getFolderPermissions = (id: string) =>
+  fetch(`${API}/folders/${id}/permissions`).then((r) => j<Permissions>(r));
+
+export const shareFolder = (id: string, address: string, role: string) =>
+  fetch(`${API}/folders/${id}/permissions`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address, role }),
+  }).then((r) => j<Grant>(r));
+
+export const changeFolderRole = (id: string, grantId: string, role: string) =>
+  fetch(`${API}/folders/${id}/permissions/${grantId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  }).then((r) => j<Grant>(r));
+
+export const revokeFolderGrant = async (id: string, grantId: string) => {
+  const r = await fetch(`${API}/folders/${id}/permissions/${grantId}`, { method: "DELETE" });
+  if (!r.ok) throw new ApiError(r.status, `HTTP ${r.status}`);
 };
 
 export const patchFile = (id: string, patch: { name?: string; folder_id?: string | null }) =>

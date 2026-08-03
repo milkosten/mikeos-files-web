@@ -187,3 +187,12 @@ body {
   .filerow :nth-child(2), .filerow :nth-child(4) { display: none; }
   .actions { visibility: visible; }
 }
+
+/* ---- tree rows with hover share + share dialog sections ---- */
+.tree-row { display: flex; align-items: center; }
+.tree-row .grow { flex: 1; }
+.tree-share { visibility: hidden; }
+.tree-row:hover .tree-share { visibility: visible; }
+.share-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.share-section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+.link-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
