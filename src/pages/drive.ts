@@ -6,7 +6,7 @@
 import {
   DriveFile, Folder, Me, Version, listFiles, listFolders, createFolder,
   patchFile, deleteFile, restoreFile, listVersions, restoreVersion, versionUrl,
-  upload, downloadUrl, logout, fmtSize, fmtDate,
+  upload, downloadUrl, fmtSize, fmtDate,
 } from "../lib/api";
 import { el, clear, toast, modal } from "../lib/dom";
 import { openShareDialog, openFolderShareDialog } from "./share";
@@ -273,8 +273,8 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
         ? `My Drive / ${state.folders.find((fo) => fo.id === (v as { folderId: string }).folderId)?.name ?? "…"}`
         : "My Drive";
 
-    const userBtn = el("button", { class: "btn ghost", title: state.user.email ?? "" }, `${state.user.name ?? "me"} · sign out`);
-    userBtn.addEventListener("click", async () => { await logout(); location.reload(); });
+    // Account is owned by the shared MikeOS bar (switcher.js) — mount it here.
+    const userBtn = el("div", { "data-mikeos-switcher": "" });
 
     const toolbar = el("header", { class: "toolbar" },
       el("span", { class: "crumbs" }, crumbs),
