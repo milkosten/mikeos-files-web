@@ -1,0 +1,29 @@
+# MikeFiles Drive web (files.osmike.com) on the 242 host.
+# Explicit project name + unique container_name; no published ports (shared
+# Caddy fronts it on the external deploy_default network). Sessions persist on
+# the RAID6 so redeploys don't sign everyone out.
+name: mikeos-files-web
+
+services:
+  web:
+    container_name: mikeos-files-web
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      PORT: "8075"
+      ISSUER: "https://account.osmike.com"
+      CLIENT_ID: "files-web"
+      FILES_API: "http://mikeos-files:8000"
+      SESSIONS_FILE: "/data/sessions.json"
+      COOKIE_SECRET: "${COOKIE_SECRET:?set in /opt/mikeos-files-web/.env}"
+    volumes:
+      - /data/mikeos-files-web:/data
+    networks:
+      - deploy_default
+    restart: unless-stopped
+    mem_limit: 256m
+
+networks:
+  deploy_default:
+    external: true

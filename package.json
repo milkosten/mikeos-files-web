@@ -1,0 +1,21 @@
+{
+  "name": "mikeos-files-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MikeFiles Drive web UI (files.osmike.com) — browse, upload, share your MikeOS drive. Sign in with MikeOS (BFF, httpOnly session); talks to files-api.osmike.com same-origin via the streaming server proxy.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}
