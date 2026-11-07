@@ -196,3 +196,15 @@ body {
 .share-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .share-section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
 .link-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.file-open { background: none; border: none; padding: 0; color: inherit; font: inherit; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.file-open:hover { color: var(--accent); text-decoration: underline; }
+.file-open:focus-visible { outline: 2px solid var(--peri); outline-offset: 3px; }
+.filerow:focus-within .actions { visibility: visible; }
+.image-preview { width: min(1100px, 94vw); max-height: 92vh; padding: 20px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--ink); }
+.image-preview::backdrop { background: rgba(23, 19, 14, 0.65); }
+.preview-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.preview-toolbar h3 { flex: 1; min-width: 120px; overflow-wrap: anywhere; margin: 0; font-size: 20px; }
+.preview-content { display: grid; place-items: center; min-height: 160px; }
+.preview-image { max-width: 100%; max-height: 70vh; object-fit: contain; }
+.preview-status { color: var(--muted); text-align: center; }

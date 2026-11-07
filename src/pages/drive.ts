@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { el, clear, toast, modal } from "../lib/dom";
 import { openShareDialog, openFolderShareDialog } from "./share";
+import { openImagePreview, isImage } from "./preview";
 
 type View =
   | { kind: "folder"; folderId: string | null }
@@ -345,9 +346,17 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
           ? el("span", { class: "date" }, fmtDate((f as DriveFile & { trashed_at?: string }).trashed_at ?? null))
           : el("span", { class: "badge subtle" }, "");
 
+      const name = el("span", { class: "name" });
+      if (v.kind !== "trash" && isImage(f)) {
+        const preview = el("button", { class: "file-open", type: "button", title: `Preview ${f.name}` }, `${iconFor(f.mime)} ${f.name}`);
+        preview.addEventListener("click", () => openImagePreview(f));
+        name.append(preview);
+      } else {
+        name.append(`${iconFor(f.mime)} ${f.name}`);
+      }
+      if (showOwnerCol) name.append(el("small", { class: "rolehint" }, ` (${f.my_role})`));
       table.append(el("div", { class: "filerow" },
-        el("span", { class: "name" }, `${iconFor(f.mime)} ${f.name}`,
-          showOwnerCol ? el("small", { class: "rolehint" }, ` (${f.my_role})`) : ""),
+        name,
         midCol,
         el("span", { class: "size" }, fmtSize(f.size)),
         el("span", { class: "date" }, fmtDate(f.updated_at)),
