@@ -4,6 +4,7 @@
 // history, and trash restore. Role-driven UI: anything the caller's `my_role`
 // doesn't allow simply isn't rendered (and the API enforces it anyway).
 import {
+  VirtualFolder, listVirtualFolders, createVirtualFolder, fileTags,
   DriveFile, Folder, Me, Version, listFiles, listFolders, createFolder,
   patchFile, deleteFile, restoreFile, listVersions, restoreVersion, versionUrl,
   upload, downloadUrl, fmtSize, fmtDate,
@@ -13,6 +14,7 @@ import { openShareDialog, openFolderShareDialog } from "./share";
 import { openImagePreview, isImage } from "./preview";
 
 type View =
+  | { kind: "virtual"; id: string; name: string }
   | { kind: "folder"; folderId: string | null }
   | { kind: "sharedFolder"; folderId: string; name: string }
   | { kind: "shared" }
@@ -26,6 +28,10 @@ interface State {
   files: DriveFile[];
   view: View;
   loading: boolean;
+  savedViews: VirtualFolder[];
+  savedError: string;
+  error: string;
+  tag: string | null;
 }
 
 const ICONS: [RegExp, string][] = [
@@ -39,16 +45,21 @@ const iconFor = (mime: string | null) =>
 
 export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): void {
   const state: State = {
-    user, folders: [], sharedFolders: [], files: [],
+    user, folders: [], sharedFolders: [], files: [], savedViews: [], savedError: "", error: "", tag: null,
     view: { kind: "folder", folderId: null }, loading: true,
   };
 
   async function refresh(): Promise<void> {
+    state.tag = null;
     state.loading = true;
+    state.error = "";
+    state.files = [];
     render();
     try {
       const v = state.view;
-      if (v.kind === "shared") {
+      if (v.kind === "virtual") {
+        state.files = await listFiles({ virtual_folder_id: v.id });
+      } else if (v.kind === "shared") {
         [state.files, state.sharedFolders] = await Promise.all([
           listFiles({ shared: true }), listFolders(true),
         ]);
@@ -67,7 +78,7 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
         if (!v.folderId) state.files = state.files.filter((f) => !f.folder_id);
       }
     } catch (e) {
-      toast(e instanceof Error ? e.message : "load failed", true);
+      state.error = e instanceof Error ? e.message : "Load failed";
     }
     state.loading = false;
     render();
@@ -179,6 +190,8 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
 
   // ---- rendering ------------------------------------------------------------
   function render(): void {
+    const focused = document.activeElement instanceof HTMLButtonElement && root.contains(document.activeElement)
+      ? {label: document.activeElement.getAttribute("aria-label"), text: document.activeElement.textContent} : null;
     clear(root);
     const v = state.view;
 
@@ -195,12 +208,17 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
       const k = fo.parent_id ?? null;
       byParent.set(k, [...(byParent.get(k) ?? []), fo]);
     }
+    const visited = new Set<string>();
+    const agentsRoot = state.folders.find(f => !f.parent_id && f.name === "Agents");
     const addFolders = (parent: string | null, depth: number) => {
       for (const fo of byParent.get(parent) ?? []) {
+        if (visited.has(fo.id) || (parent === null && fo.id === agentsRoot?.id)) continue;
+        visited.add(fo.id);
         const active = v.kind === "folder" && v.folderId === fo.id;
         const row = el("div", { class: "tree-row" });
         const b = el("button", {
           class: "tree-item grow" + (active ? " active" : ""),
+          "aria-current": active ? "page" : "false",
           style: `padding-left:${16 + depth * 14}px`,
         }, `📁 ${fo.name}`);
         b.addEventListener("click", () => { state.view = { kind: "folder", folderId: fo.id }; refresh(); });
@@ -212,6 +230,33 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
       }
     };
     addFolders(null, 1);
+    folderTree.append(el("h2", {class: "nav-heading"}, "Agents"));
+    if (agentsRoot) addFolders(agentsRoot.id, 1);
+    else folderTree.append(el("p", {class: "nav-note"}, "Agent folders will appear here."));
+    folderTree.append(el("h2", {class: "nav-heading"}, "Saved views"));
+    for (const saved of state.savedViews) {
+      const active = v.kind === "virtual" && v.id === saved.id;
+      const b = el("button", {class: "tree-item" + (active ? " active" : ""), "aria-current": active ? "page" : "false", title: saved.tags.join(", ")}, saved.name);
+      b.onclick = () => { state.view = {kind: "virtual", id: saved.id, name: saved.name}; state.tag = null; refresh(); };
+      folderTree.append(b);
+    }
+    if (state.savedError) folderTree.append(el("p", {class: "nav-note", role: "status"}, state.savedError));
+    else if (!state.savedViews.length) folderTree.append(el("p", {class: "nav-note"}, "No saved views yet."));
+    const saveView = el("button", {class: "tree-item"}, "＋ Saved view");
+    saveView.onclick = () => {
+      const name = el("input", {class: "share-input", "aria-label": "View name", placeholder: "View name"});
+      const query = el("input", {class: "share-input", "aria-label": "Tags to match", placeholder: "home:bergsjon, source:email"});
+      const save = el("button", {class: "btn primary"}, "Save view");
+      const {close} = modal(el("div", {}, el("h3", {}, "Create saved view"), el("p", {}, "Files matching all these comma-separated tags can appear in several views."), name, query, save));
+      save.onclick = async () => {
+        if (!name.value.trim() || !query.value.trim()) return;
+        save.disabled = true;
+        try { await createVirtualFolder(name.value.trim(), query.value.trim()); state.savedViews = await listVirtualFolders(); close(); render(); }
+        catch (e) { toast(e instanceof Error ? e.message : "Could not save view", true); }
+        finally { save.disabled = false; }
+      };
+    };
+    folderTree.append(saveView);
 
     const sharedBtn = el("button", {
       class: "tree-item" + (v.kind === "shared" ? " active" : ""),
@@ -235,7 +280,7 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
     }, "🗑️ Trash");
     trashBtn.addEventListener("click", () => { state.view = { kind: "trash" }; refresh(); });
 
-    const sidebar = el("aside", { class: "sidebar" },
+    const sidebar = el("aside", { class: "sidebar", id: "drive-navigation", "aria-label": "Drive navigation" },
       el("div", { class: "brand" }, el("span", { class: "mark" }), "MikeFiles"),
       folderTree,
       el("div", { class: "tree-sep" }),
@@ -270,6 +315,7 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
       v.kind === "sharedFolder" ? `Shared / ${v.name}` :
       v.kind === "trash" ? "Trash" :
       v.kind === "search" ? `Results for “${v.q}”` :
+      v.kind === "virtual" ? v.name :
       v.folderId
         ? `My Drive / ${state.folders.find((fo) => fo.id === (v as { folderId: string }).folderId)?.name ?? "…"}`
         : "My Drive";
@@ -277,8 +323,10 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
     // Account is owned by the shared MikeOS bar (switcher.js) — mount it here.
     const userBtn = el("div", { "data-mikeos-switcher": "" });
 
+    const menu = el("button", {class: "btn navigation-toggle", "aria-controls": "drive-navigation", "aria-expanded": "false"}, "Folders & views");
+    menu.onclick = () => { const open = sidebar.classList.toggle("open"); menu.setAttribute("aria-expanded", String(open)); };
     const toolbar = el("header", { class: "toolbar" },
-      el("span", { class: "crumbs" }, crumbs),
+      menu, el("span", { class: "crumbs" }, v.kind === "virtual" ? v.name : crumbs),
       search,
       isOwnView ? uploadBtn : el("span", {}),
       isOwnView ? newFolderBtn : el("span", {}),
@@ -297,16 +345,31 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
       el("span", {}, ""),
     ));
 
-    if (state.loading) {
+    const visibleFiles = state.tag ? state.files.filter(f => fileTags(f.tags).includes(state.tag!)) : state.files;
+    const filters = el("div", {class: "tag-filters", "aria-label": "Filter by tag"});
+    filters.append(el("span", {}, "Tags · match one"));
+    const tags = new Set(state.files.flatMap(f => fileTags(f.tags)));
+    if (state.tag) tags.add(state.tag);
+    for (const tag of tags) {
+      const chip = el("button", {class: "tag-chip", "aria-pressed": String(state.tag === tag)}, tag);
+      chip.onclick = () => { state.tag = state.tag === tag ? null : tag; render(); };
+      filters.append(chip);
+    }
+    if (state.tag) { const reset = el("button", {class: "tag-chip"}, "Clear filter"); reset.onclick = () => {state.tag = null; render();}; filters.append(reset); }
+    const status = el("p", {class: "result-status", role: "status", "aria-live": "polite"}, state.loading ? "Loading files…" : `${visibleFiles.length} files${state.tag ? ` tagged ${state.tag}` : ""}`);
+    if (state.error) {
+      const retry = el("button", {class: "btn"}, "Retry"); retry.onclick = refresh;
+      table.append(el("div", {class: "empty", role: "alert"}, state.error, retry));
+    } else if (state.loading) {
       table.append(el("div", { class: "empty" }, "Loading…"));
-    } else if (!state.files.length) {
+    } else if (!visibleFiles.length) {
       table.append(el("div", { class: "empty" },
         v.kind === "shared" ? "Nothing shared with you yet." :
         v.kind === "trash" ? "Trash is empty." :
-        "This folder is empty — drop files anywhere to upload."));
+        state.tag || v.kind === "virtual" || v.kind === "search" ? "No files match this view." : "This folder is empty — drop files anywhere to upload."));
     }
 
-    for (const f of state.files) {
+    for (const f of visibleFiles) {
       const canEdit = f.my_role === "owner" || f.my_role === "editor";
       const isOwner = f.my_role === "owner";
       const actions = el("span", { class: "actions" });
@@ -331,7 +394,7 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
         if (isOwner) {
           const mv = el("button", { class: "iconbtn", title: "Move" }, "📂");
           mv.addEventListener("click", () => doMove(f));
-          const sh = el("button", { class: "iconbtn", title: "Share" }, "👥");
+          const sh = el("button", { class: "iconbtn", title: "Share", "data-focus-key": `share-${f.id}` }, "👥");
           sh.addEventListener("click", () => openShareDialog(f, refresh));
           const del = el("button", { class: "iconbtn danger", title: "Move to trash" }, "🗑");
           del.addEventListener("click", () => doTrash(f));
@@ -355,6 +418,14 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
         name.append(`${iconFor(f.mime)} ${f.name}`);
       }
       if (showOwnerCol) name.append(el("small", { class: "rolehint" }, ` (${f.my_role})`));
+      if (f.created_by_agent) name.append(el("small", {class: "agent-attribution"}, `Created by ${f.created_by_agent}`));
+      const chips = el("span", {class: "file-tags"});
+      for (const tag of fileTags(f.tags)) {
+        const chip = el("button", {class: "tag-chip", "aria-pressed": String(state.tag === tag), "aria-label": `Filter by tag ${tag}`}, tag);
+        chip.onclick = () => { state.tag = state.tag === tag ? null : tag; render(); };
+        chips.append(chip);
+      }
+      name.append(chips);
       table.append(el("div", { class: "filerow" },
         name,
         midCol,
@@ -364,7 +435,7 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
       ));
     }
 
-    const main = el("main", { class: "main" }, toolbar, table);
+    const main = el("main", { class: "main" }, toolbar, filters, status, table);
     const shell = el("div", { class: "shell" }, sidebar, main);
 
     if (isOwnView) {
@@ -378,7 +449,12 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
     }
 
     root.append(shell);
+    if (focused) Array.from(root.querySelectorAll("button")).find(b =>
+      b.getAttribute("aria-label") === focused.label && b.textContent === focused.text)?.focus();
   }
 
+  listVirtualFolders().then(views => { state.savedViews = views; render(); }).catch(() => {
+    state.savedError = "Saved views unavailable. Try again later."; render();
+  });
   refresh();
 }

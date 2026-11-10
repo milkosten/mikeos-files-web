@@ -2,6 +2,7 @@
 // @osmike.com address with a role picker, change a role, revoke — and for files,
 // the share LINK (mint once, copy, revoke). Owner-only; the API enforces it.
 import {
+  listAgents, shareAgent, getAgentPermissions, revokeAgent,
   DriveFile, Folder, Permissions,
   getPermissions, share, changeRole, revoke,
   getFolderPermissions, shareFolder, changeFolderRole, revokeFolderGrant,
@@ -42,7 +43,7 @@ export function openFolderShareDialog(folder: Folder, onChange: () => void): voi
 }
 
 function roleSelect(current: string): HTMLSelectElement {
-  const sel = el("select", { class: "role-select" });
+  const sel = el("select", { class: "role-select", "aria-label": "Access role" });
   for (const r of ROLES) {
     const o = el("option", { value: r }, r);
     if (r === current) o.setAttribute("selected", "");
@@ -61,7 +62,8 @@ function openDialog(target: ShareTarget, onChange: () => void): void {
   async function load(): Promise<void> {
     clear(body);
     let perms: Permissions;
-    try { perms = await target.load(); }
+    try { perms = await target.load();
+      try { perms.grants.push(...await getAgentPermissions(target.kind, target.id)); } catch { toast("Agent permissions unavailable", true); } }
     catch (e) { body.append(el("p", {}, e instanceof Error ? e.message : "failed to load")); return; }
 
     const list = el("div", { class: "grant-list" });
@@ -73,29 +75,39 @@ function openDialog(target: ShareTarget, onChange: () => void): void {
     for (const g of perms.grants) {
       const sel = roleSelect(g.role);
       sel.addEventListener("change", async () => {
-        try { await target.reRole(g.grant_id, sel.value); toast("Role updated"); onChange(); }
+        try { await (g.principal_type === "agent" ? shareAgent(target.kind, target.id, g.principal_id!, sel.value) : target.reRole(g.grant_id, sel.value)); toast("Role updated"); onChange(); }
         catch (e) { toast(e instanceof Error ? e.message : "failed", true); load(); }
       });
       const rm = el("button", { class: "iconbtn danger", title: "Revoke access" }, "✕");
       rm.addEventListener("click", async () => {
-        try { await target.remove(g.grant_id); toast("Access revoked"); load(); onChange(); }
+        try { await (g.principal_type === "agent" ? revokeAgent(target.kind, target.id, g.principal_id!) : target.remove(g.grant_id)); toast("Access revoked"); load(); onChange(); }
         catch (e) { toast(e instanceof Error ? e.message : "failed", true); }
       });
       list.append(el("div", { class: "grant-row" },
-        el("span", { class: "who" }, g.display_name || g.username || g.user_id),
+        el("span", { class: "who" }, g.display_name || g.username || (g.principal_type === "agent" ? `Agent · ${g.principal_id}` : g.user_id)),
         sel, rm,
       ));
     }
 
-    const addr = el("input", { class: "share-input", type: "text", placeholder: "name@osmike.com" });
+    const addr = el("input", { class: "share-input", type: "text", placeholder: "name@osmike.com", "aria-label": "Recipient email" });
+    const agent = el("input", {class: "share-input", "aria-label": "Agent recipient", list: "agent-recipients", placeholder: "Agent ID"});
+    const suggestions = el("datalist", {id: "agent-recipients"});
+    const recipientType = el("select", {class: "role-select", "aria-label": "Recipient type"}, el("option", {value: "person"}, "Person"), el("option", {value: "agent"}, "Agent"));
+    agent.hidden = true;
+    const directoryStatus = el("p", {class: "fineprint", role: "status"});
+    recipientType.onchange = () => { addr.hidden = recipientType.value === "agent"; agent.hidden = recipientType.value !== "agent"; };
+    listAgents().then(agents => {
+      for (const a of agents) suggestions.append(el("option", {value: a.agent_id}, a.name || a.agent_id));
+      directoryStatus.textContent = "Suggestions come from your Agents folders. Enter another agent ID to share with it.";
+    }).catch(() => { directoryStatus.textContent = "Agent suggestions unavailable. Enter an agent ID or email address."; });
     const sel = roleSelect("editor");
     const addBtn = el("button", { class: "btn primary" }, "Share");
     addBtn.addEventListener("click", async () => {
-      const a = (addr as HTMLInputElement).value.trim();
+      const a = recipientType.value === "agent" ? agent.value : addr.value.trim();
       if (!a) return;
       addBtn.setAttribute("disabled", "");
       try {
-        await target.add(a, sel.value);
+        await (recipientType.value === "agent" ? shareAgent(target.kind, target.id, a, sel.value) : target.add(a, sel.value));
         toast(`Shared with ${a}`);
         (addr as HTMLInputElement).value = "";
         load(); onChange();
@@ -107,7 +119,7 @@ function openDialog(target: ShareTarget, onChange: () => void): void {
       }
     });
 
-    body.append(list, el("div", { class: "share-add" }, addr, sel, addBtn));
+    body.append(list, el("div", { class: "share-add" }, recipientType, addr, agent, suggestions, sel, addBtn), directoryStatus);
 
     // Link section — files only. The raw token exists ONLY at mint time, so the
     // copyable URL is shown once; afterwards the choice is revoke or regenerate.

@@ -15,6 +15,8 @@ export interface DriveFile {
   sha256: string | null;
   folder_id: string | null;
   tags: unknown;
+  created_by_agent?: string | null;
+  updated_by_agent?: string | null;
   created_at: string | null;
   updated_at: string | null;
   my_role: "owner" | "editor" | "commenter" | "viewer";
@@ -38,6 +40,8 @@ export interface Version {
 
 export interface Grant {
   grant_id: string;
+  principal_type?: string;
+  principal_id?: string;
   user_id: string;
   username: string | null;
   display_name: string | null;
@@ -81,8 +85,9 @@ export const createFolder = (name: string, parent_id: string | null) =>
     body: JSON.stringify({ name, parent_id }),
   }).then((r) => j<{ folder: Folder }>(r)).then((d) => d.folder);
 
-export const listFiles = (opts: { q?: string; folder_id?: string; shared?: boolean; trashed?: boolean } = {}) => {
+export const listFiles = (opts: { q?: string; folder_id?: string; shared?: boolean; trashed?: boolean; virtual_folder_id?: string } = {}) => {
   const p = new URLSearchParams();
+  if (opts.virtual_folder_id) return fetch(`${API}/views/${encodeURIComponent(opts.virtual_folder_id)}/files`).then(r => j<{files: DriveFile[]}>(r)).then(d => d.files);
   if (opts.q) p.set("q", opts.q);
   if (opts.folder_id) p.set("folder_id", opts.folder_id);
   if (opts.shared) p.set("shared_with_me", "true");
@@ -218,4 +223,31 @@ export function fmtDate(iso: string | null): string {
   return d.toDateString() === today.toDateString()
     ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : d.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+}
+
+export interface Agent { agent_id: string; name: string }
+export interface VirtualFolder { id: string; name: string; tags: string[]; metadata: Record<string, unknown> }
+// Folder-backed suggestions reflect agents already represented in this drive.
+export const listAgents = async (): Promise<Agent[]> => {
+  const folders = await listFolders();
+  const root = folders.find(f => !f.parent_id && f.name === "Agents");
+  return folders.filter(f => !!root && f.parent_id === root.id).map(f => ({agent_id: f.name, name: f.name}));
+};
+export const listVirtualFolders = () => fetch(`${API}/views`).then(r => j<{views: VirtualFolder[]}>(r)).then(d => d.views);
+export const createVirtualFolder = (name: string, tags: string) => fetch(`${API}/views`, {
+  method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name, tags: tags.split(",").map(t => t.trim()).filter(Boolean), metadata: {}}),
+}).then(r => j<VirtualFolder>(r));
+const agentPermissionsUrl = (kind: "file" | "folder", id: string) => `${API}/${kind === "file" ? "files" : "folders"}/${encodeURIComponent(id)}/agent-permissions`;
+export const getAgentPermissions = (kind: "file" | "folder", id: string) => fetch(agentPermissionsUrl(kind, id)).then(r => j<{permissions: (Grant & {id?: string})[]}>(r)).then(d => d.permissions.map(g => ({...g, grant_id: g.grant_id || g.id || g.principal_id || "", principal_type: "agent"})));
+export const shareAgent = (kind: "file" | "folder", id: string, principal_id: string, role: string) =>
+  fetch(agentPermissionsUrl(kind, id), {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({principal_type: "agent", principal_id, role}),
+  }).then(r => j<unknown>(r));
+export const revokeAgent = async (kind: "file" | "folder", id: string, agent: string) => {
+  const r = await fetch(`${agentPermissionsUrl(kind, id)}/${encodeURIComponent(agent)}`, {method: "DELETE"});
+  if (!r.ok) throw new ApiError(r.status, `HTTP ${r.status}`);
+};
+export function fileTags(tags: unknown): string[] {
+  if (typeof tags === "string") { try { return fileTags(JSON.parse(tags)); } catch { return tags.split(",").map(t => t.trim()).filter(Boolean); } }
+  return Array.isArray(tags) ? tags.filter((t): t is string => typeof t === "string") : [];
 }
