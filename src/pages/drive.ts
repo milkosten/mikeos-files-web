@@ -1,3 +1,4 @@
+import { accountMenu } from "../lib/account";
 // The Drive: sidebar (My Drive folder tree + Shared with me + Trash), toolbar
 // (breadcrumb, search, upload, new folder), file table with per-role actions,
 // drag-drop upload with progress, share dialogs (files, folders, links), version
@@ -320,8 +321,8 @@ export function renderDrive(root: HTMLElement, user: NonNullable<Me["user"]>): v
         ? `My Drive / ${state.folders.find((fo) => fo.id === (v as { folderId: string }).folderId)?.name ?? "…"}`
         : "My Drive";
 
-    // Account is owned by the shared MikeOS bar (switcher.js) — mount it here.
-    const userBtn = el("div", { "data-mikeos-switcher": "" });
+    // Files account menu includes app settings and MikeOS account access.
+    const userBtn = accountMenu(user);
 
     const menu = el("button", {class: "btn navigation-toggle", "aria-controls": "drive-navigation", "aria-expanded": "false"}, "Folders & views");
     menu.onclick = () => { const open = sidebar.classList.toggle("open"); menu.setAttribute("aria-expanded", String(open)); };

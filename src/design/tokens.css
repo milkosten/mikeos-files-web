@@ -1,0 +1,10 @@
+/* Canonical osmike-web :root. Source and extension rules: SOURCES.md, DESIGN.md. */
+:root {
+    --bg:#FBFAF7; --ink:#17130E; --muted:#6c6458; --faint:#9a9082;
+    --line:#ece6dc; --card:#ffffff;
+    --coral:#FF8A5B; --rose:#FF6FA5; --peri:#7C7CFF; --sky:#4FC4E8;
+    --accent:#E8553F;
+    --disp:"Fraunces",Georgia,"Times New Roman",serif;
+    --sans:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --grad:linear-gradient(100deg,var(--coral),var(--rose) 42%,var(--peri) 82%);
+  }

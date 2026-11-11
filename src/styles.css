@@ -1,22 +1,6 @@
-/* MikeFiles Drive — osmike.com design language (see ../osmike-web/public/index.html):
-   warm cream bg, ink text, Fraunces display + Manrope sans, coral→rose→peri
-   gradient accents, pill buttons, soft warm-shadow cards. */
-:root {
-  --bg: #FBFAF7;
-  --ink: #17130E;
-  --muted: #6c6458;
-  --faint: #9a9082;
-  --line: #ece6dc;
-  --card: #ffffff;
-  --coral: #FF8A5B;
-  --rose: #FF6FA5;
-  --peri: #7C7CFF;
-  --accent: #E8553F;
-  --danger: #d64545;
-  --disp: "Fraunces", Georgia, "Times New Roman", serif;
-  --sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --grad: linear-gradient(100deg, var(--coral), var(--rose) 42%, var(--peri) 82%);
-}
+@import "./design/tokens.css";
+@import "./design/theme.css";
+:root { --danger: #d64545; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -51,7 +35,7 @@ body {
   line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 18px; text-wrap: balance;
 }
 .tagline { color: var(--muted); margin: 0 0 32px; font-size: 17px; }
-.fineprint { color: var(--faint); font-size: 12.5px; margin-top: 22px; }
+.fineprint { color: var(--muted); font-size: 12.5px; margin-top: 22px; }
 
 /* ---- buttons ---- */
 .btn {
@@ -106,7 +90,7 @@ body {
   border-radius: 999px; padding: 8px 18px; width: 270px; font-size: 14px; font-family: var(--sans);
 }
 .search:focus { outline: none; border-color: var(--peri); }
-.search::placeholder { color: var(--faint); }
+.search::placeholder { color: var(--muted); }
 
 /* ---- file table ---- */
 .filetable { flex: 1; overflow-y: auto; padding: 10px 16px 48px; }
@@ -116,12 +100,12 @@ body {
 }
 .filerow:hover:not(.head) { background: var(--card); box-shadow: 0 10px 24px -18px rgba(23, 19, 14, 0.3); }
 .filerow.head {
-  color: var(--faint); font-size: 12px; font-weight: 600; text-transform: uppercase;
+  color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.14em; border-bottom: 1px solid var(--line); border-radius: 0;
 }
 .filerow .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 .filerow .size, .filerow .date { color: var(--muted); font-size: 13.5px; }
-.rolehint { color: var(--faint); }
+.rolehint { color: var(--muted); }
 .actions { display: flex; gap: 4px; justify-content: flex-end; visibility: visible; }
 .filerow:hover .actions { visibility: visible; }
 .iconbtn {
@@ -137,7 +121,7 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;
 }
 .badge.subtle { border: none; background: none; }
-.empty { color: var(--faint); text-align: center; padding: 70px 0; font-size: 16px; }
+.empty { color: var(--muted); text-align: center; padding: 70px 0; font-size: 16px; }
 
 /* ---- modal / share ---- */
 .modal-backdrop {
@@ -194,7 +178,7 @@ body {
 .tree-share { visibility: hidden; }
 .tree-row:hover .tree-share { visibility: visible; }
 .share-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
-.share-section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+.share-section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .link-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .file-open { background: none; border: none; padding: 0; color: inherit; font: inherit; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
@@ -250,3 +234,21 @@ body {
   .grant-row { flex-wrap: wrap; }
   .grant-row .who { flex-basis: 100%; }
 }
+
+.account-menu { position: relative; }
+.account-menu summary { cursor: pointer; list-style: none; }
+.account-menu[open] .account-panel { position: absolute; right: 0; top: 48px; z-index: 20; width: 240px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 16px 40px #0003; }
+.account-panel a { display: block; padding: 10px 0; color: var(--ink); }
+.account-panel p { margin: 0; overflow-wrap: anywhere; color: var(--muted); }
+.settings-page { max-width: 760px; margin: auto; padding: 32px 24px; }
+.settings-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.settings-page h1 { font-family:var(--disp); font-size:40px; font-weight:500; }
+.appearance-card { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:24px; border:1px solid var(--line); background:var(--card); border-radius:20px; margin-bottom:24px; }
+.appearance-card label { font-weight:700; }
+.appearance-card p { color:var(--muted); margin:8px 0 0; }
+.appearance-card select { background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px; font:inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media(max-width:540px) { .appearance-card { align-items:stretch; flex-direction:column; } }
+
+.account-menu summary { min-width:44px; min-height:44px; cursor:pointer; }
+@media(max-width:540px) { .settings-page { padding:24px 16px; } }

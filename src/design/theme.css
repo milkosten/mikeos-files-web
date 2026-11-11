@@ -1,0 +1,10 @@
+/* Adoption extension; load after canonical tokens.css. Set resolved data-theme before paint. */
+html[data-theme="light"] {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#14110d; --ink:#efe9df; --muted:#a89e8f;
+  --faint:#82796b; --line:#2b251d; --card:#1c1712;
+  --accent:#ff6a4d;
+}

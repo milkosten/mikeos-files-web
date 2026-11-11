@@ -191,11 +191,18 @@ app.all(/^\/drive-api\/.*/, async (req, res) => {
 app.get("/healthz", (_req, res) => res.json({ ok: true, api: FILES_API }));
 
 // Static SPA (long cache for hashed assets) + fallback for client routes.
-app.use(express.static(dist, {
+const staticAssets = express.static(dist, {
+  index: false,
   setHeaders(res, path) {
     if (path.includes("/assets/")) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   },
-}));
-app.get(/^(?!\/drive-api\/|\/auth\/).*/, (_req, res) => res.sendFile(join(dist, "index.html")));
+});
+app.use((req, res, next) => req.path === "/index.html" ? next() : staticAssets(req, res, next));
+app.get(/^(?!\/drive-api\/|\/auth\/).*/, (req, res) => {
+  const sub = sessionOf(req)?.user?.sub || "signed-out";
+  const safe = String(sub).replace(/[^a-zA-Z0-9@._-]/g, "");
+  res.setHeader("Cache-Control", "private, no-store");
+  res.type("html").send(readFileSync(join(dist, "index.html"), "utf8").replace("__APPEARANCE_USER__", safe));
+});
 
 app.listen(PORT, () => console.log(`[mikeos-files-web] drive on :${PORT} (client ${CLIENT_ID}, api ${FILES_API})`));
