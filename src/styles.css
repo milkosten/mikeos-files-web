@@ -242,11 +242,15 @@ body {
 .account-panel p { margin: 0; overflow-wrap: anywhere; color: var(--muted); }
 .settings-page { max-width: 760px; margin: auto; padding: 32px 24px; }
 .settings-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.settings-page h1 { font-family:var(--disp); font-size:40px; font-weight:500; }
+.settings-page h1 { font-family:var(--disp); font-size:40px; font-weight:400; }
 .appearance-card { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:24px; border:1px solid var(--line); background:var(--card); border-radius:20px; margin-bottom:24px; }
 .appearance-card label { font-weight:700; }
 .appearance-card p { color:var(--muted); margin:8px 0 0; }
-.appearance-card select { background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px; font:inherit; }
+.appearance-options { margin:0; padding:0; border:0; min-width:0; }
+.appearance-options legend { font-weight:700; margin-bottom:8px; }
+.appearance-choice { display:flex; align-items:center; gap:10px; min-height:44px; padding:0 12px; cursor:pointer; border-radius:8px; }
+.appearance-choice input { accent-color:var(--ink); width:20px; height:20px; margin:0; }
+.appearance-choice:focus-within { outline:2px solid var(--ink); outline-offset:2px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media(max-width:540px) { .appearance-card { align-items:stretch; flex-direction:column; } }
 
